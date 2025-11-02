@@ -1,0 +1,911 @@
+---
+title: "Effect of COVID-19 Pandemic on Home Advantage in the EPL"
+author: "David Jeong, Ethan Donecoff, Jon Michael Stroh, Yuan Shan"
+format: pdf
+fontsize: 10.5 pt
+editor: visual
+bibliography: references.bib
+link-citations: true
+output:
+  pdf_document: default
+---
+
+```{r, echo=FALSE}
+#| label: load-lib
+#| warning: false
+#| message: false
+
+library(tidyverse)
+library(readxl)
+library(knitr)
+library(lubridate)
+library(scales)
+```
+
+## Introduction[^1]
+
+[^1]: David worked on introduction, EDA, math derivation, and references. Yuan worked on model implementation for hypothesis testing and prediction of 2022/23 season, and limitations. Jon implemented MM algorithm for BT model without ties, and Ethan worked on overall discussion and README.
+
+Ever since it was founded on 1992, The English Premier League (EPL) has long been one of the popular, most watched soccer leagues in the world. Contested by 20 clubs, the EPL system has its seasons typically running from August to May, with each team playing 38 matches where one plays against the other team twice (once in home, once in an away match).
+
+Usually, in sports, home-team advantage is a well-known phenomenon, primarily caused by the home-team crowd effect, referee bias, away-team travel effect, familiarity with local conditions, etc. This also holds true for the case of EPL, as the analysis of the EPL in seasons 1992/1993 \~ 2011/2012 showed that 60.77% of total points earned by teams were won in home matches [@ALLENJONES]. Yet the main limitation of previous works on studying home advantage is that the phenomenon can only be understood in terms of points obtained by a team. This would make it difficult to distinguish whether a strong team has a home advantage or not, as one would expect the team to score just as much points they score on home as on away as well.
+
+Hence, to provide more insight into understanding the home advantage phenomenon in the EPL, we intend to fit an extension of the Bradley-Terry model, which can account for ties and usefully predict the outcome of a paired comparison.
+
+We also aim to delve deeper into the home advantage phenomenon by comparing the EPL seasons affected by the COVID-19 pandemic (2019/20, 2020/21) with the regular seaons beforehand, given that the COVID seasons resumed with matches behind closed doors. Since the fans were not present on the stadiums, if not very limited, one would expect the crowd effect, one of the huge primary causes of home advantage, to be significantly reduced and thus influence the effect of home advantage taking place in match. Thus, we would like to explore in-depth whether the home advantage phenomenon was present or not during the EPL seasons affected by the COVID-19 pandemic, and if it were present, what would its magnitude have been. Therefore, this leads to the formulation of our research question:
+
+How did the COVID-19 pandemic influence the home advantage phenomenon in the EPL during 2019/20 and 2020/21 seasons, compared to the regular seasons beforehand?
+
+### Data Description
+
+The EPL dataset we used was a Microsoft Excel spreadsheet found in Kaggle, obtained from the SportsDB and compiled by Lenoire77. The dataset contains the match results of every EPL season from 1992 to 2022 with its standings, organized into an individual sheet tab by season. It also includes "All Time Table" and "All Time Average" sheets for all the teams that were in the EPL for at least one season. We intend to focus on individual fixtures to analyze the home advantage phenomenon.
+
+## Exploratory Data Analysis
+
+Before implementing the Bradley-Terry model, we conducted some exploratory data analysis to have a preliminary view of the effect of COVID-19 pandemic on the home advantage phenomenon.
+
+We first calculated the average proportion of home wins of all EPL teams for non-COVID and COVID seasons, in which the COVID seasons are namely 2019-2020 and 2020-2021 seasons in the EPL. The average proportion was calculated by obtaining the sum of all home wins in non-COVID or COVID seasons and dividing this sum by the total number of matches in non-COVID/COVID seasons. The results are shown in Table 1.
+
+We also calculated the average proportion of home wins of top 4 and bottom 3 teams in non-COVID and COVID seasons. Given that Marek and Vavra (2020) pointed out how previous approaches to study home advantage based on points obtained may not work on strongest teams in the EPL since they would earn as much points on away as they do on home and vice versa for the weakest teams [@MAREKVAVRA], we explored whether the home advantage phenomenon is present and have diminshed due to COVID-19 for the strongest and weakest teams in the EPL.
+
+We specifically chose top 4 teams as the strongest in the EPL since only top 4 teams in the EPL can advance to the UEFA Champions League, an annual club association football competition contested by top division European clubs. Similarly, bottom 3 teams were representative of the weakest in the EPL since the bottom 3 teams at the end of an EPL season are relegated to European Football League Championship, the next highest in the English football league system after the EPL.
+
+The calculation of the average proportion of home wins was done in the same way it was conducted for calculating the results in Table 1. The results are shown in Table 2.
+
+```{r, echo=FALSE}
+#| label: home-wins
+#| message: false
+
+# Calculate home wins for non-COVID seasons
+homeWins_1992_93 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1992-1993") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1993_94 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1993-1994") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1994_95 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1994-1995") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1995_96 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1995-1996") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1996_97 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1996-1997") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1997_98 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1997-1998") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1998_99 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1998-1999") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_1999_00 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "1999-2000") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2000_01 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2000-2001") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2001_02 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2001-2002") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2002_03 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2002-2003") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2003_04 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2003-2004") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2004_05 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2004-2005") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2005_06 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2005-2006") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2006_07 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2006-2007") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2007_08 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2007-2008") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2008_09 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2008-2009") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2009_10 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2009-2010") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2010_11 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2010-2011") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2011_12 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2011-2012") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2012_13 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2012-2013") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2013_14 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2013-2014") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2014_15 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2014-2015") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2015_16 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2015-2016") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2016_17 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2016-2017") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2017_18 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2017-2018") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2018_19 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2018-2019") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2021_22 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2021-2022") %>%
+  filter(Home == Winner) %>% nrow()
+
+# Calculate home wins for COVID seasons
+homeWins_2019_20 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2019-2020") %>%
+  filter(Home == Winner) %>% nrow()
+
+homeWins_2020_21 <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", "2020-2021") %>%
+  filter(Home == Winner) %>% nrow()
+```
+
+```{r, echo=FALSE}
+#| label: avg-homeWins
+
+# Calculate proportion of home wins for non-COVID seasons
+nonCOVID_homeWins <- (homeWins_1992_93 + homeWins_1993_94 + homeWins_1994_95 + homeWins_1995_96 + homeWins_1996_97 + homeWins_1997_98 + homeWins_1998_99 + homeWins_1999_00 + homeWins_2000_01 + homeWins_2001_02 + homeWins_2002_03 + homeWins_2003_04 + homeWins_2004_05 + homeWins_2005_06 + homeWins_2006_07 + homeWins_2007_08 + homeWins_2008_09 + homeWins_2009_10 + homeWins_2010_11 + homeWins_2011_12 + homeWins_2012_13 + homeWins_2013_14 + homeWins_2014_15 + homeWins_2015_16 + homeWins_2016_17 + homeWins_2017_18 + homeWins_2018_19 + homeWins_2021_22) / (22 * 21 * 3 + 20 * 19 * 25)
+
+# Calculate proportion of home wins for COVID seasons
+COVID_homeWins <- (homeWins_2019_20 + homeWins_2020_21) / (20 * 19 * 2)
+
+# Present comparison of proportions
+homeWins_matrix <- matrix(c(nonCOVID_homeWins, COVID_homeWins), ncol = 2)
+
+rownames(homeWins_matrix) <- 'Avg. Home Win %'
+colnames(homeWins_matrix) <- c('Non-COVID Season', 'COVID Season')
+
+as.table(homeWins_matrix) %>%
+  kable(digits = 3,
+        caption = 'Effect of COVID-19 on Avg. Home Win % of All EPL Teams')
+```
+
+Table 1 shows that the average home win proportion out of all matches in an EPL season decreased from approx. 46.1% to approx. 41.6% due to the COVID-19 pandemic (4.5% decrease). This may indicate that the home advantage was indeed present in the EPL, as no crowd in the stadiums during the COVID seasons could have diminished the home advantage phenomenon.
+
+```{r, echo=FALSE}
+#| label: homeWin-selected
+#| message: false
+
+calcHomeWins <- function(start, end, topOrBot){
+  # Create string representing sheet based on input start and end of season
+  select_sheet <- paste(start, end, sep = "-")
+  
+  raw_season_data <- read_excel("~/project-team02/Data/All premier Leage Results - 1992 Onwards_update.xlsx", select_sheet)
+  
+  # Filter raw season data based on input(top 4, or bottom 3)
+  if(topOrBot == "top"){
+    filteredData <- raw_season_data %>%
+      filter(Position <= 4)
+  }else{
+    if(start == 1992 | start == 1993 | start == 1994){
+      filteredData <- raw_season_data %>%
+        filter(Position >= 20)
+    }else{
+      filteredData <- raw_season_data %>%
+        filter(Position >= 18)
+    }
+  }
+  
+  # Extract names of top 4/bottom 3
+  selectedTeam <- c()
+  for(i in filteredData[13]){
+    selectedTeam <- append(selectedTeam, i)
+  }
+  
+  # Filter raw data only for selected teams
+  selectedTeam_data <- raw_season_data %>%
+    filter(Home %in% selectedTeam)
+  
+  # Calculate home wins from selectedTeam_data
+  selected_homeWins <- selectedTeam_data %>%
+    filter(Home == Winner) %>% nrow()
+  
+  return(selected_homeWins)
+}
+
+# Calculate home win % for top 4 teams in non-COVID seasons
+total_homeWins <- 0
+for(i in 1992:2021){
+  if(i != 2019 & i != 2020){
+    total_homeWins <- total_homeWins + calcHomeWins(i, i + 1, "top")
+  }
+}
+nonCOVID_topFour_avgHomeWin <- total_homeWins / (84 * 3 + 76 * 25)
+
+# Calculate home win % for top 4 teams in COVID seasons
+total_homeWins <- 0
+for(i in 2019:2020){
+  total_homeWins <- total_homeWins + calcHomeWins(i, i + 1, "top")
+}
+COVID_topFour_avgHomeWin <- total_homeWins / (76 * 2)
+
+# Calculate home win % for bottom 3 teams in non-COVID seasons
+total_homeWins <- 0
+for(i in 1992:2021){
+  if(i != 2019 & i != 2020){
+    total_homeWins <- total_homeWins + calcHomeWins(i, i + 1, "bot")
+  }
+}
+nonCOVID_botThree_avgHomeWin <- total_homeWins / (63 * 3 + 57 * 25)
+
+# Calculate home win % for bottom 3 teams in COVID seasons
+total_homeWins <- 0
+for(i in 2019:2020){
+  total_homeWins <- total_homeWins + calcHomeWins(i, i + 1, "bot")
+}
+COVID_botThree_avgHomeWin <- total_homeWins / (57 * 2)
+
+# Present comparison of proportions
+homeWins_matrix_2 <- matrix(c(nonCOVID_topFour_avgHomeWin,
+                              nonCOVID_botThree_avgHomeWin,
+                              COVID_topFour_avgHomeWin,
+                              COVID_botThree_avgHomeWin), 2, 2)
+
+rownames(homeWins_matrix_2) <- c('Top Four', 'Bottom Three')
+colnames(homeWins_matrix_2) <- c('Non-COVID Season', 'COVID Season')
+
+as.table(homeWins_matrix_2) %>%
+  kable(digits = 3,
+        caption = 'Effect of COVID-19 on Avg. Home Win % of Top 4, Bottom 3
+        Teams of EPL')
+```
+
+The results in Table 2 also align with the results in Table 1. As can be seen, the effect of COVID-19 reduces the home advantage phenomenon for both strongest (top 4) and the weakest (bottom 3) teams in the EPL. Specifically, the average proportion of home wins has decreased by about 7.9% for top 4 teams, while it has decreased by approx. 4.1% for bottom 3 teams. What is interesting to note here is that the decreasing factor for top 4 teams is almost double that of the bottom 3, possibly indicating that the strongest teams in the EPL were benefitting more from the home advantage than the weakest clubs.
+
+## Model Implementation
+
+### Relevant Mathematics
+
+The most basic Bradley-Terry (BT) model, which does not account for ties, can be used to model and assess the contribution of home advantage.
+
+$$
+\text{P(i beats j at home)} = \frac{\theta p_i}{\theta p_i + p_j}
+$$ $$
+\text{P(i loses to j at home)} = \frac{p_j}{\theta p_i + p_j}
+$$ where $\theta \in \mathbb{R}^+$ represents home advantage, and $p_i, p_j$ represent the team ranking parameters of team $i$ and $j$, respectively.
+
+Now, let $a_{ij}$ be the number of times team $i$ beats team $j$ at home, $b_{ij}$ be the number of times team $i$ loses to team $j$ at home. Assuming all matches are independent, we can write the log-likelihood of the BT model with home advantage. Let $w_i$ be the total number of wins by team $i$ and $h = \sum_{i} \sum_{j} a_{ij}$ be the total number of home wins across all teams. Then, we can re-formulate the log-likelihood:
+
+$$
+\log L(\mathbf{p}, \theta) = h \log \theta + \sum_{i} w_i \log p_i - \sum_{i}\sum_{j} (a_{ij} + b_{ij}) \log(\theta p_i + p_j)
+$$ noting the fact that $\sum_{i} w_i \log p_i = \sum_{i}\sum_{j} \left[ a_{ij} \log p_i + b_{ij} \log p_j \right]$.
+
+By supporting line minorization, we can find the surrogate function $g$, which is constantly less than $\log L(\mathbf{p}, \theta)$. Here, $$
+g(\mathbf{p}, \theta |\mathbf{p}_n, \theta_n) = h \log \theta + \sum_{i} \log p_i - \sum_{i}\sum_{j} \frac{(a_{ij} + b_{ij})(\theta p_i + p_j)}{\theta_n p_{ni} + p_{nj}}
+$$ We can optimize our surrogate function $g$ instead of the objective function to estimate the home advantage parameter $\theta$ and team ranking parameters $\mathbf{p} = \{p_1, ... , p_n \}$ where $n$ is the total number of teams. We set $\nabla g = 0$. As the $\theta p_i$ term prevents direct optimization, we perform cyclic block ascent by updating $\theta$ holding $\mathbf{p}$ fixed and update each $p_i$ holding all other parameters fixed.
+
+Update $$
+\theta_{n+1} = \frac{h}{\sum_{i}\sum_{j} \frac{p_{ni}(a_{ij} + b_{ij})}{\theta_n p_{ni} + p_{nj}}} \tag{1}
+$$ and then update each $$
+p_{n+1, i} = \frac{w_i}{\sum_{j} \frac{\theta_{n+1}(a_{ij} + b_{ij})}{\theta_{n+1}p_{ni} + p_{nj}} + \sum_{j} \frac{(a_{ji} + b_{ji})}{\theta_{n+1}p_{nj} + p_{ni}}} \tag{2}
+$$ The team with the largest $\hat{p_i}$ will be the best ranking team, while $\hat{\theta} = 0$ would mean there is no home advantage.
+
+For this research, we also intend to implement the Rao-Kupper model, an extension of the basic BT model accounting for ties [@HUNTER]. The model supposes that $$
+\text{P(i beats j)} = \frac{p_i}{p_i + \theta p_j}
+$$ $$
+\text{P(j beats i)} = \frac{p_j}{\theta p_i + p_j}
+$$ $$
+\text{P(i ties with j)} = \frac{(\theta^2 - 1) p_i p_j}{\left[ (p_i + \theta p_j)(p_j + \theta p_i) \right]}
+$$ The likelihood of the Rao-Kupper model is given by $$
+L(\mathbf{p}, \theta) = \frac{1}{2} \sum_{i}\sum_{j} \left\{ 2w_{ij} \log \left( \frac{p_i}{p_i + \theta p_j} \right) + t_{ij} \log \left( \frac{(\theta^2 - 1) p_i p_j}{(p_i + \theta p_j)(p_j + \theta p_i)} \right)  \right\}
+$$ where $t_{ij}$ is the number of ties team $i$ has tied with team $j$.
+
+Given that $-\log x \geq 1 - \log y - \frac{x}{y}$ for positive $x, y$ with equality iff $x = y$, we may construct the function
+
+$$
+Q_n(\mathbf{p}, \theta) = \sum_{i}\sum_{j} \left\{
+(w_{ij} + t_{ij}) \left( \log p_i - \frac{p_i + \theta p_j}{p_{ni} + \theta_n p_{nj}} \right) + t_{ij} \log (\theta^2 - 1)
+\right\}
+$$ Maximization of $Q_n(\mathbf{p}, \theta_n)$ with respect to $\mathbf{p}$ gives $$
+p_{n+1, i} = \left[ \sum_{j \neq i} s_{ij} \right] \left[ \sum_{j \neq i} \left(
+\frac{s_{ij}}{p_{ni} + \theta_n p_{nj}} + \frac{\theta_n s_{ji}}{\theta_n p_{ni} + p_{nj}}
+\right) \right] ^{-1}
+$$ where $s_{ij} = w_{ij} + t_{ij}$, representing the number of times team $i$ won against or tied with team $j$. Solving a quadratic equation to maximize $Q_n(\mathbf{p}_{n+1}, \theta)$ with respect to $\theta$ gives the update for $\theta$ in a cyclic MM algorithm:
+
+$$
+\theta_{n+1} = \frac{1}{2C_n} + \sqrt{1 + \frac{1}{4C_n^{2}}}
+$$ where $$
+C_n = \frac{2}{T} \sum_{i}\sum_{j \neq i} \frac{p_{n+1, j}(s_{ij})}{p_{n+1, i} + \theta_n p_{n+1, j}}.
+$$ $T$ represents the total number of ties observed among all of the comparisons between team $i$ and $j$.
+
+### Home Advantage Exploration using Basic BT Model
+
+In this section, we implement the basic BT model by removing all ties within the EPL dataset and explore the impact of home field advantage in the EPL on purely wins and losses. We will compare the phenomenon between non-COVID and COVID seasons. We use equations $(1), (2)$ from the previous section to implement the MM update for the parameters $\theta$, which represents home advantage, and $\mathbf{p}$, a vector of team ranking parameters of all teams in the EPL.
+
+```{r, echo = FALSE}
+#| label: MM-data-prep
+
+# data
+allgames = read.csv("Data/All_Match_from_1992.csv")
+
+# remove ties
+allgames = subset(allgames, !is.na(Winner))
+
+allgames = select(allgames, Date, Home, Away, Winner)
+
+# seperate COVID/no crowd and non-COVID/crowd games
+
+# according to research, the final third of the 2019-20 season and the entirety of the 2020-21 season were restricted to zero or limited attendance. For 2019, this began mid June.
+
+noncovid_games = subset(allgames, !(as.Date(Date) >= as.Date("2020-06-12") & as.Date(Date) <= as.Date("2021-05-23")))
+
+covid_games = subset(allgames, as.Date(Date) >= as.Date("2020-06-12") & as.Date(Date) <= as.Date("2021-05-23"))
+
+# numerical home winner
+
+noncovid_games$Y <- ifelse(noncovid_games$Winner == noncovid_games$Home, 1, 0)
+covid_games$Y <- ifelse(covid_games$Winner == covid_games$Home, 1, 0)
+```
+
+```{r, echo=F}
+#| label: MM-alg
+
+# Create function for MM algorithm based on basic BT model
+
+MM_algorithm <- function(p0, theta0, h0, teams, A, B, iter){
+  
+  #initial
+  p <- p0
+  theta <- theta0
+  n <- length(teams)
+  h <- h0
+  
+  # home wins plus road wins
+  w_i <- rowSums(A) + colSums(B)
+
+  # MM alg
+  for (iteration in 1:iter) {
+  
+    # Update theta
+    num <- h
+    den <- 0
+    for (i in 1:n) {
+      for (j in 1:n) {
+        if (i == j) {
+          next
+        }
+          den <- den + ((p[i] * (A[i,j] + B[i,j])) / (theta * p[i] + p[j]))
+      }
+    }
+    
+    theta <- num / den
+  
+    # Update p
+    for (i in 1:n) {
+     for (j in 1:n){
+        denom1 <- sum(theta * (A[i,] + B[i,]) / (theta * p[i] + p[j]))
+        denom2 <- sum((A[,i] + B[,i]) / (theta * p[j] + p[i]))
+      }
+
+      p[i] <- w_i[i] / (denom1 + denom2)
+    }
+  }
+  
+  return(list(p = p, theta = theta))
+}
+```
+
+```{r, echo=F}
+#| label: covid-MM
+
+# Teams during COVID season
+unique_teams_2 <- sort(unique(c(covid_games$Home, covid_games$Away)))
+n_2 <- length(unique_teams_2)
+
+# build a_ij and b_ij
+covid_A <- matrix(0, n_2, n_2)
+covid_B <- matrix(0, n_2, n_2)
+
+colnames(covid_A) <- unique_teams_2
+colnames(covid_B) <- unique_teams_2
+rownames(covid_A) <- unique_teams_2
+rownames(covid_B) <- unique_teams_2
+
+for (i in 1:nrow(covid_games)) {
+  home <- covid_games$Home[i]
+  home_index <- which(unique_teams_2 == home)
+  away <- covid_games$Away[i]
+  away_index <- which(unique_teams_2 == away)
+  outcome <- covid_games$Y[i]
+  if (outcome == 1) {
+    covid_A[home_index, away_index] <- covid_A[home_index, away_index] + 1
+  } else {
+    covid_B[home_index, away_index] <- covid_B[home_index, away_index] + 1
+  }
+}
+
+# Initialization of parameters (p = 1, theta = 1.5, iter = 100)
+p0 <- rep(1, length(unique_teams_2))
+theta0 <- 1.5
+iter <- 100
+h0 <- sum(covid_games$Y)
+teams <- unique_teams_2
+A <- covid_A
+B <- covid_B
+
+covid_results = MM_algorithm(p0, theta0, h0, teams, A, B, iter)
+
+# Present p_mle, theta_mle
+p_mle = covid_results$p
+covid_theta_mle = covid_results$theta
+
+covid_power = data.frame(team = unique_teams_2, p_mle = p_mle)
+covid_power = covid_power[order(-p_mle),]
+
+#covid_power %>%
+#  head(5) %>%
+#  kable(digits = 5,
+#        caption = "Top 5 EPL Teams during COVID seasons, ranked by highest
+#        p MLEs")
+```
+
+```{r, echo=F}
+#| label: non-COVID-MM
+
+### divide into each non-COVID season
+theta_season = c()
+non_covid_pMLE = data.frame()
+for (i in 1992:2019) {
+  year = as.character(i)
+  year_nxt = as.character(i + 1)
+  date = "-08-01"
+  start_date = paste(year, date, sep = "")
+  end_date = paste(year_nxt, date, sep = "")
+  noncovid_games_season = subset(noncovid_games, 
+                                 (as.Date(Date) >= as.Date(start_date) 
+                                   & as.Date(Date) <= as.Date(end_date)))
+  
+  # build matrix for non-covid games
+  
+  # teams
+  unique_teams <- sort(unique(c(noncovid_games_season$Home, noncovid_games_season$Away)))
+  n <- length(unique_teams)
+  
+  # build a_ij and b_ij
+  A <- matrix(0, n, n)
+  B <- matrix(0, n, n)
+  
+  colnames(A) <- unique_teams
+  colnames(B) <- unique_teams
+  rownames(A) <- unique_teams
+  rownames(B) <- unique_teams
+  
+  for (i in 1:nrow(noncovid_games_season)) {
+    home <- noncovid_games_season$Home[i]
+    home_index <- which(unique_teams == home)
+    away <- noncovid_games_season$Away[i]
+    away_index <- which(unique_teams == away)
+    outcome <- noncovid_games_season$Y[i]
+    if (outcome == 1) {
+      A[home_index, away_index] <- A[home_index, away_index] + 1
+    } else {
+      B[home_index, away_index] <- B[home_index, away_index] + 1
+    }
+  }
+  
+  # non-covid games MM
+  
+  p0 <- rep(1, length(unique_teams))
+  theta0 <- 2.0
+  iter <- 80
+  h0 <- sum(noncovid_games_season$Y)
+  teams <- unique_teams
+  A <- A
+  B <- B
+  
+  noncovid_results = MM_algorithm(p0, theta0, h0, teams, A, B, iter)
+  
+  # non-covid results
+  
+  p_mle = noncovid_results$p
+  season_team_pMLE = data.frame(team = unique_teams, p_mle = p_mle)
+  
+  if(i == 1992){
+    non_covid_pMLE = season_team_pMLE
+  }else{
+    non_covid_pMLE = bind_rows(non_covid_pMLE, season_team_pMLE)
+  }
+  
+  theta_mle = noncovid_results$theta
+  theta_season = c(theta_season, theta_mle)
+}
+
+# Get average of pMLEs across all non-COVID seasons for each EPL team
+non_covid_pMLE <- non_covid_pMLE %>%
+  group_by(team) %>%
+  summarise_at(vars(p_mle), list(name = mean))
+
+# Sort by descending order of p_mle, present table
+non_covid_pMLE = non_covid_pMLE[order(non_covid_pMLE$name, 
+                                      decreasing = TRUE),]
+
+#non_covid_pMLE %>%
+#  head(5) %>%
+#  kable(digits = 5,
+#        caption = "Top 5 EPL Teams during non-COVID seasons, ranked by
+#        highest p MLEs")
+```
+
+```{r, echo=F, fig.height = 3, fig.cap = 'Theta MLEs by Every Season in the EPL since 1992'}
+#| label: present-theta-MLE
+thetaMLE_compile = data.frame(matrix(ncol = 2))
+colnames(thetaMLE_compile) = c("Season", "Theta_MLE")
+cnt = 1
+for(i in 1992:2019){
+  if(i < 1999){
+    yr_nxt = i + 1 - 1900
+  }else{
+    yr_nxt = i + 1 - 2000
+  }
+  
+  if(yr_nxt < 10){
+    yr_nxt_updated = paste("0", yr_nxt, sep = "")
+    season_name = paste(i, yr_nxt_updated, sep = "/")
+  }else{
+    season_name = paste(i, yr_nxt, sep = "/")
+  }
+  thetaMLE_compile = thetaMLE_compile %>%
+    add_row(Season = season_name, Theta_MLE = theta_season[cnt])
+  cnt = cnt + 1
+}
+thetaMLE_compile = thetaMLE_compile %>%
+  add_row(Season = "COVID", Theta_MLE = covid_theta_mle) %>%
+  filter(!is.na(Season) & !is.na(Theta_MLE))
+
+ggplot(thetaMLE_compile, aes(x = Season, y = Theta_MLE, group = 1)) +
+  geom_line() + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+Figure 1 represents the trend of $\hat{\theta}$ by season since 1992 in the EPL. Generally, $\hat{\theta}$ values tend to fluctuate between a little above 1 and around 15. What is interesting to note here is the spike of $\hat{\theta}$ to a value of 159.657 at the 2011/12 season. Such a spike may be ascribed to the fact that the season champion Manchester City went undefeated in all 19 home games, and there were a lot of home wins with extreme goal differentials, such as the 8-2 win for Manchester United against Arsenal and 7-1 win for Arsenal against Blackburn.
+
+On the other hand, the $\hat{\theta}$ value during the COVID season turned out to be approx. 1.02, extremely proximate to the value of 1 meaning there would be no home field advantage. Hence we can speculate that the attendance restriction imposed due to the COVID-19 pandemic greatly contributed to the reduction in home advantage in the EPL.
+
+### Hypothesis Testing
+
+```{r, echo=F}
+#| label: dnorm-func
+normal_func <- function(x, mean, sd) {
+  return(dnorm(x, mean, sd))
+}
+```
+
+```{r, echo=F, fig.cap = 'Distribution of Seasonal Theta MLEs in the EPL since 1992', fig.height = 3}
+#| label: thetaMLE-dist
+#| warning: false
+#| message: false
+
+# Model distribution of theta MLEs
+seasons = paste(seq(1992, 2019), seq(1993, 2020), sep="/")
+
+theta_df <- data.frame(
+  Season = seasons,
+  Theta_MLE = theta_season
+)
+
+theta_df = theta_df[theta_df$Theta_MLE < 4.8, ]
+
+ggplot(theta_df, aes(Theta_MLE)) +
+  geom_histogram(aes(y = ..density..), bins = 12, binwidth = 0.43, fill = "gray", color = "darkgray") +
+  stat_function(fun = normal_func, args = list(mean = 1.9, sd = 0.67)) + 
+  theme_bw()
+```
+
+We also conducted hypothesis testing on the distribution of $\hat{\theta}$ by season we estimated in the previous section. Figure 2 shows the overall distribution, which aligns well with the bell curve and can be considered approximately normal. We standardized the $\hat{\theta}$ of the COVID seasons by computing the z-score using the mean and variance of the distribution, which are outlined in Table 3 below. Then, we utilized the pnorm() function with the z-score as the input to compute the total likelihood up to the given z-score input and ultimately obtain the p-value.
+
+Here, the null and alternative hypotheses would be: $$
+H_0: \hat{\theta_{nc}} = \hat{\theta_{c}}, \text{Home advantage has not significantly changed due to COVID-19}
+$$ $$
+H_A: \hat{\theta_{nc}} \neq \hat{\theta_{c}}, \text{Home advantage has significantly changed due to COVID-19}
+$$ where $\hat{\theta_{nc}}$ represents $\hat{\theta}$ for non-COVID seasons, while $\hat{\theta_{c}}$ represents $\hat{\theta}$ for COVID seasons.
+
+```{r, echo=F}
+#| label: hypo-test
+
+# Calculate mean, variance of distribution
+theta_mean <- mean(theta_df$Theta_MLE)
+theta_var <- var(theta_df$Theta_MLE)
+
+# Calculate p-value
+z = (covid_theta_mle - theta_mean) / (theta_var ^ 0.5)
+p_val = pnorm(z)
+
+# Present mean, variance, p-value
+hypo_matrix = matrix(c(theta_mean, theta_var, p_val), nrow = 3, ncol = 1)
+hypo_matrix = as.data.frame(hypo_matrix)
+
+colnames(hypo_matrix) = c("Value")
+rownames(hypo_matrix) = c("Mean", "Variance", "P-Value")
+
+hypo_matrix %>%
+  kable(digits = 3,
+        caption = "Summary of Major Indicators of Theta MLE Distribution")
+```
+
+As seen from Table 3, we see that the calculated p-value is approx. 0.041, which, compared with the significance level of $\alpha = 0.05$, we would reject the null hypothesis and conclude that home advantage has been significantly changed due to the limited attendance from COVID-19 pandemic.
+
+### Prediction for the 2022/23 season
+
+This section aims to predict the probabilities of the results for the remaining games of the current Premier League season (2022/23 season) and give the expected final points of each team. Specifically, considering that many draws may occur in Premier League matches, the Rao-Kupper model is used to obtain the maximum likelihood estimation of the Power Index for each team in the Premier League. The Power Index is used to measure the strength of each team and predict the probabilities of the outcomes of any two teams' match. It is worth noting that we evaluate the teams based on its performance after the 2018/19 season. After obtaining the win-loss probabilities for each match, we combine it with the current standings table to calculate the expected final points.
+
+```{r, echo=F}
+#| label: result_merge
+#| warning: false
+#| message: false
+# data for current season
+current_season <- read_csv("Data/epl_results_2022-23.csv")
+
+# set up data.frame for B-T model
+c_season_bt <- data.frame(current_season$Date, current_season$HomeTeam, current_season$AwayTeam, Winner = character(nrow(current_season)), 
+                      Draw1 = character(nrow(current_season)),
+                      Draw2 = character(nrow(current_season)))
+
+colnames(c_season_bt) <- c("Date", "HomeTeam", "AwayTeam", "Winner", "Draw1", "Draw2")
+
+for(i in 1:nrow(current_season)){
+  if(current_season$FTHG[i] > current_season$FTAG[i]){
+    c_season_bt$Winner[i] <- current_season$HomeTeam[i]
+    c_season_bt$Draw1[i] <- NA
+    c_season_bt$Draw2[i] <- NA
+  } else if(current_season$FTAG[i] > current_season$FTHG[i]){
+    c_season_bt$Winner[i] <- current_season$AwayTeam[i]
+    c_season_bt$Draw1[i] <- NA
+    c_season_bt$Draw2[i] <- NA
+  } else {
+    c_season_bt$Winner[i] <- NA
+    c_season_bt$Draw1[i] <- current_season$HomeTeam[i]
+    c_season_bt$Draw2[i] <- current_season$AwayTeam[i]
+  }
+}
+
+c_season_bt$Date <- format(dmy(c_season_bt$Date), "%Y-%m-%d")
+c_season_bt[c_season_bt == "Man City"] <- "Manchester City"
+c_season_bt[c_season_bt == "Man United"] <- "Manchester United"
+
+all_match = read.csv("Data/All_Match_from_1992.csv")
+names(all_match)[4] <- "HomeTeam"
+names(all_match)[5] <- "AwayTeam"
+names(all_match)[7] <- "Draw1"
+names(all_match)[8] <- "Draw2"
+all_match = subset(all_match, select = -X)
+all_match = subset(all_match, select = -ID)
+rownames(all_match) <- NULL
+
+match_df = rbind(all_match, c_season_bt)
+names(match_df)[5] <- "Draw_1"
+names(match_df)[6] <- "Draw_2"
+names(match_df)[2] <- "Home"
+names(match_df)[3] <- "Away"
+match_df = match_df[match_df$Date > "2020-08-01",]
+```
+
+```{r, echo=F}
+#| label: get_s_matrix
+#| warning: false
+#| message: false
+pair_df = match_df %>%
+  group_by(Home, Away) %>%
+  summarise(total = n(), Home_win = sum(Home == Winner,  na.rm = TRUE), 
+            Away_win = sum(Away == Winner,  na.rm = TRUE), Draw = sum(is.na(Winner)))
+
+teams = unique(c(unique(pair_df$Home), unique(pair_df$Away)))
+
+s <- matrix(0, nrow = length(teams), ncol = length(teams))
+for (i in 1:length(teams)){
+  for (j in 1:length(teams)){
+    if (i != j){
+      # get s_ij: i beats or tied j
+      s_ij = pair_df[(pair_df$Home == teams[i]) & (pair_df$Away == teams[j]), ][['Home_win']] + 
+        pair_df[(pair_df$Home == teams[i]) & (pair_df$Away == teams[j]), ][['Draw']] + 
+        pair_df[(pair_df$Home == teams[j]) & (pair_df$Away == teams[i]), ][['Away_win']] + 
+        pair_df[(pair_df$Home == teams[j]) & (pair_df$Away == teams[i]), ][['Draw']]
+      if (length(s_ij) == 0){
+        s_ij = 0
+      }
+      s[i,j] = s_ij
+    }
+  }
+}
+```
+
+```{r, echo=F}
+#| label: MM-algorithm
+#| warning: false
+#| message: false
+MM_algorithm <- function(p0, theta0, teams, data, iter){
+  p = p0
+  theta = theta0
+  # get T: all ties 
+  t = sum(pair_df$Draw)
+  
+  for (k in 1:iter){
+    # update p_i
+    for (i in 1:length(teams)){
+      sum_a = 0
+      sum_b = 0
+      for (j in 1:length(teams)){
+        if (i != j){
+          s_ij = s[i,j]
+          s_ji = s[j,i]
+
+          sum_a = sum_a + s_ij
+          sum_b = sum_b + ((s_ij / (p[i] + theta * p[j])) + 
+                             ((theta * s_ji) / (theta * p[i] + p[j])))
+        }
+      }
+      if(sum_b != 0){
+        p[i] = sum_a * (1 / sum_b) 
+      }
+    }
+    
+    # update c_k
+    sum_c = 0
+    for (i in 1:length(teams)){
+      for(j in 1:length(teams)){
+        if(i != j){
+          s_ij = s[i,j]
+          sum_c = sum_c + ( (p[j] * s_ij) / (p[i] + theta * p[j])  )
+        }
+      }
+    }
+    c_k = (2 / t) * sum_c
+    
+    # update theta
+    theta = (1 / (2 * c_k)) + (1 + 1/(4 * c_k^2) ) ^ 0.5
+    
+  }
+  return(list(p = p, theta = theta))
+}
+```
+
+```{r, echo=F}
+#| label: get_Power_Index
+#| warning: false
+#| message: false
+p0 <- rep(1, length(teams))
+theta0 = 1.5
+iter = 1000
+result = MM_algorithm(p0, theta0, teams, pair_df, iter)
+p_mle = result$p
+theta_mle = result$theta
+
+result_df = data.frame(Team = teams, p = p_mle)
+p_list <- split(result_df$p, result_df$Team)
+```
+
+```{r, echo=F}
+#| label: prediction_exp_score
+#| warning: false
+#| message: false
+current_season_all = read.csv("Data/epl-2022-UTC.csv")
+
+rest_games = current_season_all[current_season_all$Result == "",]
+rest_games = subset(rest_games, select = -Result)
+
+rest_games[rest_games == "Man City"] <- "Manchester City"
+rest_games[rest_games == "Man Utd"] <- "Manchester United"
+rest_games[rest_games == "Nottingham Forest"] <- "Nottingham"
+rest_games[rest_games == "Spurs"] <- "Tottenham"
+
+rest_games["P_Home_Win"] =  unlist(p_list[unlist(rest_games["Home.Team"])]) / 
+  (unlist(p_list[unlist(rest_games["Home.Team"])]) + theta_mle * unlist(p_list[unlist(rest_games["Away.Team"])]))
+
+rest_games["P_Away_Win"] =  unlist(p_list[unlist(rest_games["Away.Team"])]) / 
+  (unlist(p_list[unlist(rest_games["Away.Team"])]) + theta_mle * unlist(p_list[unlist(rest_games["Home.Team"])]))
+
+rest_games["P_Draw"] = ((theta_mle^2 -1) * 
+                          unlist(p_list[unlist(rest_games["Away.Team"])]) * 
+                          unlist(p_list[unlist(rest_games["Home.Team"])])) / 
+  ( (unlist(p_list[unlist(rest_games["Away.Team"])]) + theta_mle * unlist(p_list[unlist(rest_games["Home.Team"])])) *
+      (unlist(p_list[unlist(rest_games["Home.Team"])]) + theta_mle * unlist(p_list[unlist(rest_games["Away.Team"])]))
+      )
+
+Exp_scores <- setNames(rep(0, length(teams)), teams)
+
+for (i in teams){
+  Exp_scores[[i]] = sum(rest_games[rest_games["Home.Team"] == i,]$P_Home_Win) * 3 + 
+    sum(rest_games[rest_games["Home.Team"] == i,]$P_Draw) * 1 + 
+    sum(rest_games[rest_games["Away.Team"] == i,]$P_Away_Win) * 3 + 
+    sum(rest_games[rest_games["Away.Team"] == i,]$P_Draw) * 1
+}
+
+current_scores = read.csv("Data/EPL_Standings_2022:23.csv")
+current_scores = current_scores[c("CLUBS", "Scores")]
+names(current_scores)[1] <- "Team"
+names(current_scores)[2] <- "Current Scores"
+
+result_df["Exp scores of rest games"] = round(Exp_scores)
+
+prediction = merge(result_df, current_scores, by = "Team")
+prediction["Expected Total Scores"] = prediction["Exp scores of rest games"] + prediction["Current Scores"]
+
+prediction_table = prediction %>%
+  arrange(desc(`Expected Total Scores`)) %>%
+  head(row.names = NULL) %>%
+  data.frame(row.names = NULL)
+
+kable(digits = 4, prediction_table, format = "latex",
+      caption = "Expected Scores, Power Index Estimations of Each Team
+      for 2022/23 Season",
+      linesep = "\\addlinespace")
+```
+
+Table 4 presents the relevant information and Power Index estimates for the top teams with the highest expected total scores, with the complete table shown in the Appendix. It is worth noting that the Power Index estimated by the Rao-Kupper model aligns well with our understanding of the teams. For instance, the Power Indexes of traditional top teams, such as the English Premier League "Big Six", are the highest among all teams, and some teams that have emerged in the last two years (such as Newcastle, which was acquired by a Saudi consortium in 2021) also have relatively high Power Indexes.
+
+The title race between Manchester City and Arsenal will be the main focus of the current Premier League season. Currently, Arsenal is still leading Manchester City in the standings, but according to our predictions, Manchester City has a higher expected total score, indicating a greater possibility of winning this year's Premier League trophy.
+
+```{r, echo=F}
+#| label: prediction_rest_games
+#| warning: false
+#| message: false
+rest_games$P_Home_Win = percent(rest_games$P_Home_Win)
+rest_games$P_Away_Win = percent(rest_games$P_Away_Win)
+rest_games$P_Draw = percent(rest_games$P_Draw)
+rest_games_table <- rest_games[10:nrow(rest_games), -1] %>%
+  head(row.names = NULL) %>%
+  data.frame(row.names = NULL)
+
+# Shorten column names for reproducibility
+colnames(rest_games_table)[1] = "Round"
+colnames(rest_games_table)[4] = "Home"
+colnames(rest_games_table)[5] = "Away"
+
+rest_games_table %>%
+  select(Round, Home, Away, P_Home_Win, P_Away_Win, P_Draw) %>%
+  kable(digits = 5, format = "latex", 
+        caption = "Probability Prediction of Remaining Matches for 2022/23
+        Season",
+        linesep = "\\addlinespace")
+```
+
+Table 5 shows the predicted results of some upcoming matches. Among them, the battle for the top spot between Manchester City and Arsenal on April 26th will be the focus. According to our predictions, Manchester City has a high probability of winning the game, reaching 63%, while Arsenal only has a 32% chance of winning. The probability of a draw between the two teams is 5%.
+
+## Discussion
+
+In this project we developed two methods for describing the impact of COVID-19 on the English Premier League home advantage. The Bradley-Terry model was used as a starting point; however, changes had to be made to account for the possibility of ties. Using the Rao-Kupper model, we use a log-likelihood function that incorporates ties and we maximize it with MM algorithm to obtain a surrogate function. This allowed us to predict the scores and finish to the current Premier League season. We found that five of the "Big Six" teams were expected to finish in the top 6 in standings, which indicates that the predictions align with an existing notion of which teams are the best. Probabilities for wins, losses, and ties were also computed for each remaining game.
+
+In another approach we simply ignored ties and used the existing Bradley-Terry framework to determine the impact of COVID on home field advantage. We found that the MLE for $\theta$ during the COVID pandemic fell to 1.02, which suggests that the advantage of home field was diminished. Since the distribution of home advantage is roughly normal, we were also able to perform hypothesis testing to determine that the $\theta_{MLE}$ during COVID was significantly different than than the non-COVID home advantage at a significance level of $0.05$. Together, these findings give some credibility to the idea that fans play a part in the outcome of games and that reduced capacity due to the pandemic reduced this advantage.
+
+### Limitations
+
+One potential drawback of our analysis was the limited amount of data during the pandemic. Since each team only plays every other team twice, few matchups occurred between each team during the time in which the pandemic limited attendance. As a result, the results are not the most robust, and there is no way to directly increase sample size. This may also explain the occurrence of an outlier in our $\theta$ MLEs during the 2011/2012 Premier League season. Due to some lopsided match results and unusually good home performances by top teams, home advantage was shown as extreme by the model.
+
+In addition, the result shown in Table 5 shows that the predicted probabilities of a tie for the remaining games are concentrated around 5%, which does not align with our prior knowledge. One possible explanation is that the estimated MLE of the threshold parameter $\theta$ in the Rao-Kupper model is too small. As shown in the Rao-Kupper model, the probability of a tie is:
+
+$$
+\text{P(i ties with j)} = \frac{(\theta^2 - 1) p_i p_j}{\left[ (p_i + \theta p_j)(p_j + \theta p_i) \right]}
+$$
+
+, which is monotonically increasing with $\theta$. Therefore, theta can be understood as a measure of the sensitivity of the game, i.e., when theta is large, even teams with relatively close levels will have a winner, and vice versa. Specifically, the Rao-Kupper model declares a tie when $|lnp_i - lnp_j| < ln(\theta)$. Further, the reason for the small estimated value of $\theta$ could be the high level of uncertainty in the Premier League, where even strong teams have a considerable chance of losing to much weaker ones(upsets). This requires $\theta$ to be small to "compromise" with the probability of such occurrences. For example, in this season's matches, Manchester City tied with Nottingham Forest, Chelsea lost to Southampton, Tottenham lost to Newcastle, and so on. Therefore, given the high level of uncertainty brought by factors such as spectators, referees, scheduling, etc. in the English Premier League, the model still needs some fine-tuning to adapt to the characteristics of Premier League matches.
+
+### Future Work
+
+One area of improvement may be implementing a more advanced model to account for home advantage and ties at the same time. An example of such is the David-epsilon model, which has a modified probability for wins and ties:
+
+```{=tex}
+\begin{align*}
+P(\text{$i$ beats $j$}) &= 
+\begin{cases}
+\gamma u_i/(\theta u_i + u_j + \theta\sqrt{u_iu_j}), & \text{if $i$ is at home} \\
+u_i/(u_i + \theta u_j + \theta\sqrt{u_iu_j}), & \text{if $j$ is at home}
+\end{cases}\\
+P(\text{$i$ ties $j$}) &= 
+\begin{cases}
+\theta\sqrt{u_iu_j}/(\gamma u_i + u_j + \theta\sqrt{u_iu_j}), & \text{if $i$ is at home} \\
+\theta\sqrt{u_iu_j}/(u_i + \gamma u_j + \theta\sqrt{u_iu_j}), & \text{if $j$ is at home}
+\end{cases}
+\end{align*}
+```
+Implementing this model with another MM algorithm may be more accurate, and better capture the probability of ties, which was low for each game in our study.
+
+## References
